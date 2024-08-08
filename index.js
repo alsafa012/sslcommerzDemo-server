@@ -41,6 +41,7 @@ async function run() {
         app.post("/create-payment", async (req, res) => {
             const paymentInfo = req.body;
             const tnxId = new ObjectId().toString();
+            // const initiateData = new URLSearchParams({}).toString()
             const initiateData = {
                 store_id: "rj66b37da699b3f",
                 store_passwd: "rj66b37da699b3f@ssl",
@@ -87,7 +88,7 @@ async function run() {
             });
             // const response =await axios.post('https://sandbox.sslcommerz.com/gwprocess/v4/api.php',initiateData)
 
-            // console.log(response.data);
+            // console.log(response.data.status === "SUCCESS");
             const saveData = {
                 customer_name: "okk",
                 paymentTnxIdId: tnxId,
@@ -99,63 +100,116 @@ async function run() {
             console.log("response?.data?.successData", response?.data?.successData);
             console.log("response.data", response.data);
             if (result) {
-                res.send({ paymentUrl: response.data?.GatewayPageURL })
+                res.send({ response: response?.data, paymentUrl: response.data?.GatewayPageURL })
             }
         })
-        app.post('/success-payment', async (req, res) => {
+        // Reusable function to handle payment status update
+        const handlePaymentStatus = async (req, res, expectedStatus, redirectUrl) => {
             const successData = req.body;
-            if (successData.status !== "VALID") {
-                throw new Error("invalid")
-            }
-            const filter = {
-                paymentTnxIdId: successData.tran_id
-            }
-            const updateInfo = {
-                $set: {
-                    status: "success"
-                }
-            }
-            const updateData = await paymentInfoCollection.updateOne(filter, updateInfo)
             console.log("successDataasdsadasdasdasasdasasasdasasd: ", successData);
-            console.log("updateData:::", updateData);
-            res.redirect('http://localhost:5173/successPage')
-        })
-        app.post('/fail-payment', async (req, res) => {
-            // status: 'FAILED',
-            const successData = req.body;
-            if (successData.status !== "FAILED") {
-                throw new Error("invalid")
+            if (successData.status !== expectedStatus) {
+                throw new Error(`Invalid status: expected ${expectedStatus}, received ${successData.status}`);
             }
-            const filter = {
-                paymentTnxIdId: successData.tran_id
-            }
+            const filter = { paymentTnxIdId: successData.tran_id };
             const updateInfo = {
                 $set: {
-                    status: "FAILED"
+                    status: expectedStatus,
+                    tran_date: successData.tran_date,
+                    card_type: successData.card_type,
+                    store_amount: successData.store_amount,
+                    card_no: successData.card_no,
+                    bank_tran_id: successData.bank_tran_id
                 }
-            }
-            const updateData = await paymentInfoCollection.updateOne(filter, updateInfo)
-            console.log("fail-response", successData);
-            res.redirect('http://localhost:5173/failPage')
-        })
-        app.post('/cancel-payment', async (req, res) => {
-            // status: 'CANCELLED',
-            const successData = req.body;
-            if (successData.status !== "CANCELLED") {
-                throw new Error("invalid")
-            }
-            const filter = {
-                paymentTnxIdId: successData.tran_id
-            }
-            const updateInfo = {
-                $set: {
-                    status: "CANCELLED"
-                }
-            }
-            const updateData = await paymentInfoCollection.updateOne(filter, updateInfo)
-            console.log("cancle-response", successData);
-            res.redirect('http://localhost:5173/cancelPage')
-        })
+            };
+            await paymentInfoCollection.updateOne(filter, updateInfo);
+            res.redirect(redirectUrl);
+        };
+
+        // Route for success-payment
+        app.post('/success-payment', (req, res) => {
+            handlePaymentStatus(req, res, "VALID", 'http://localhost:5173/successPage');
+        });
+
+        // Route for fail-payment
+        app.post('/fail-payment', (req, res) => {
+            handlePaymentStatus(req, res, "FAILED", 'http://localhost:5173/failPage');
+        });
+
+        // Route for cancel-payment
+        app.post('/cancel-payment', (req, res) => {
+            handlePaymentStatus(req, res, "CANCELLED", 'http://localhost:5173/cancelPage');
+        });
+        // app.post('/success-payment', async (req, res) => {
+        //     const successData = req.body;
+        //     console.log("successDataasdsadasdasdasasdasasasdasasd: ", successData);
+        //     if (successData.status !== "VALID") {
+        //         throw new Error("invalid")
+        //     }
+        //     const filter = {
+        //         paymentTnxIdId: successData.tran_id
+        //     }
+        //     const updateInfo = {
+        //         $set: {
+        //             status: "success",
+        //             tran_date: successData.tran_date,
+        //             card_type: successData.card_type,
+        //             store_amount: successData.store_amount,
+        //             card_no: successData.card_no,
+        //             bank_tran_id: successData.bank_tran_id
+        //         }
+        //     }
+        //     const updateData = await paymentInfoCollection.updateOne(filter, updateInfo)
+
+        //     // res.send({successData: successData})
+        //     console.log("updateData:::", updateData);
+        //     res.redirect('http://localhost:5173/successPage')
+        // })
+        // app.post('/fail-payment', async (req, res) => {
+        //     // status: 'FAILED',
+        //     const successData = req.body;
+        //     if (successData.status !== "FAILED") {
+        //         throw new Error("invalid")
+        //     }
+        //     const filter = {
+        //         paymentTnxIdId: successData.tran_id
+        //     }
+        //     const updateInfo = {
+        //         $set: {
+        //             status: "FAILED",
+        //             tran_date: successData.tran_date,
+        //             card_type: successData.card_type,
+        //             store_amount: successData.store_amount,
+        //             card_no: successData.card_no,
+        //             bank_tran_id: successData.bank_tran_id
+        //         }
+        //     }
+        //     const updateData = await paymentInfoCollection.updateOne(filter, updateInfo)
+        //     console.log("fail-response", successData);
+        //     res.redirect('http://localhost:5173/failPage')
+        // })
+        // app.post('/cancel-payment', async (req, res) => {
+        //     // status: 'CANCELLED',
+        //     const successData = req.body;
+        //     if (successData.status !== "CANCELLED") {
+        //         throw new Error("invalid")
+        //     }
+        //     const filter = {
+        //         paymentTnxIdId: successData.tran_id
+        //     }
+        //     const updateInfo = {
+        //         $set: {
+        //             status: "CANCELLED",
+        //             tran_date: successData.tran_date,
+        //             card_type: successData.card_type,
+        //             store_amount: successData.store_amount,
+        //             card_no: successData.card_no,
+        //             bank_tran_id: successData.bank_tran_id
+        //         }
+        //     }
+        //     const updateData = await paymentInfoCollection.updateOne(filter, updateInfo)
+        //     console.log("cancle-response", successData);
+        //     res.redirect('http://localhost:5173/cancelPage')
+        // })
 
         app.delete("/paymentInfo", async (req, res) => {
             const result = await paymentInfoCollection.deleteMany({});
