@@ -1,10 +1,23 @@
 const express = require("express");
+require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const cors = require("cors");
-const { default: axios } = require("axios");
 const app = express();
+const { default: axios } = require("axios");
+const nodemailer = require('nodemailer');
 const port = process.env.PORT || 5000;
-
+// Configure the email transport using SMTP
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.APP_USER, // Replace with your Gmail address
+        pass: process.env.APP_PASS, // Replace with your Gmail password or app-specific password
+    },
+});
+// const formData = require('form-data');
+//   const Mailgun = require('mailgun.js');
+//   const mailgun = new Mailgun(formData);
+// const mg = mailgun.client({ username: 'api', key: process.env.MAILGUN_API_KEY });
 // middleware
 app.use(cors());
 app.use(express.json());
@@ -43,34 +56,34 @@ async function run() {
             const tnxId = new ObjectId().toString();
             // const initiateData = new URLSearchParams({}).toString()
             const initiateData = {
-                store_id: "rj66b37da699b3f",
-                store_passwd: "rj66b37da699b3f@ssl",
+                store_id: process.env.STORE_ID,
+                store_passwd: process.env.STORE_PASSWD,
                 total_amount: paymentInfo?.amount,
-                currency: "EUR",
+                currency: "BDT",
                 tran_id: tnxId,
                 success_url: "http://localhost:5000/success-payment",
                 fail_url: "http://localhost:5000/fail-payment",
                 cancel_url: "http://localhost:5000/cancel-payment",
-                cus_name: "Customer Name",
-                cus_email: "cust@yahoo.com",
-                cus_add1: "Dhaka",
-                cus_add2: "Dhaka",
-                cus_city: "Dhaka",
-                cus_state: "Dhaka",
+                cus_name: "RIDOY",
+                cus_email: "alsafa012@gmail.com",
+                cus_add1: "Dhaka1",
+                cus_add2: "Dhaka2",
+                cus_city: "Dhaka3",
+                cus_state: "Dhaka4",
                 cus_postcode: "1000",
                 cus_country: "Bangladesh",
                 cus_phone: "01711111111",
                 cus_fax: "01711111111",
                 shipping_method: "NO",
-                product_name: "laptop",
+                product_name: "laptop-451 sds sdsd",
                 product_category: "laptptop",
                 product_profile: "laptpop",
-                ship_name: "Customer Name",
-                ship_add1: "Dhaka",
-                ship_add2: "Dhaka",
-                ship_city: "Dhaka",
-                ship_state: "Dhaka",
-                ship_postcode: "1000",
+                ship_name: "AL-SAFA",
+                ship_add1: "Dhaka11",
+                ship_add2: "Dhaka22",
+                ship_city: "Dhaka33",
+                ship_state: "Dhaka44",
+                ship_postcode: "10004",
                 ship_country: "Bangladesh",
                 multi_card_name: "mastercard,visacard,amexcard",
                 value_a: "ref001_A",
@@ -78,6 +91,7 @@ async function run() {
                 value_c: "ref003_C",
                 value_d: "ref004_D"
             }
+            console.log("initiateData", initiateData);
             const response = await axios({
                 method: "POST",
                 url: "https://sandbox.sslcommerz.com/gwprocess/v4/api.php",
@@ -122,6 +136,43 @@ async function run() {
                 }
             };
             await paymentInfoCollection.updateOne(filter, updateInfo);
+
+            // Send success email if the payment is successful
+
+            if (expectedStatus === "VALID") {
+                const mailOptions = {
+                    from: process.env.APP_USER, // My Gmail address
+                    to: 'rjridoy012@gmail.com', // customer email
+                    subject: 'Payment Successful',
+                    // text: `Your payment of ${successData.store_amount} was successful. Transaction ID: ${successData.tran_id}`,
+                    html: `<div>
+                    <h2>Your payment of ${successData.store_amount} was successful.</h2>
+                    <h3>Your Transaction ID: ${successData.tran_id}</h3>
+                    <h4>amount: ${successData.amount}</h4>
+                    <h4>tran_date: ${successData.tran_date}</h4>
+                    <h4>card_type: ${successData.card_type}</h4>
+                    </div>`
+                };
+                transporter.sendMail(mailOptions, (error, info) => {
+                    if (error) {
+                        console.error("Error sending success email:", error);
+                    } else {
+                        console.log("Success email sent successfully:", info.response);
+                        res.send({response: response})
+                    }
+                });
+                // mailgun
+                // mg.messages.create('sandbox-123.mailgun.org', {
+                // // mg.messages.create('sandbox83d61979a56847deabb8819fc126cbb6.mailgun.org', {
+                //     from: "Excited User <postmaster@sandbox83d61979a56847deabb8819fc126cbb6.mailgun.org>",
+                //     to: ["alsafa012@gmail.com"],
+                //     subject: "Hello",
+                //     text: "Testing some Mailgun awesomeness!",
+                //     html: "<h1>Testing some Mailgun awesomeness!</h1>"
+                // })
+                // .then(msg => console.log(msg)) // logs response data
+                // .catch(err => console.log(err)); // logs any error
+            }
             res.redirect(redirectUrl);
         };
 
