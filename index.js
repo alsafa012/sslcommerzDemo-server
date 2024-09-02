@@ -64,8 +64,8 @@ async function run() {
                 success_url: "http://localhost:5000/success-payment",
                 fail_url: "http://localhost:5000/fail-payment",
                 cancel_url: "http://localhost:5000/cancel-payment",
-                cus_name: "RIDOY",
-                cus_email: "alsafa012@gmail.com",
+                cus_name: paymentInfo?.name,
+                cus_email: paymentInfo?.email,
                 cus_add1: "Dhaka1",
                 cus_add2: "Dhaka2",
                 cus_city: "Dhaka3",
@@ -104,11 +104,13 @@ async function run() {
 
             // console.log(response.data.status === "SUCCESS");
             const saveData = {
-                customer_name: "okk",
+                customer_name: paymentInfo?.name,
+                customer_email: paymentInfo?.email,
                 paymentTnxIdId: tnxId,
                 amount: paymentInfo?.amount,
                 status: "pending"
             }
+            console.log("saveData-saveData", saveData);
             const result = await paymentInfoCollection.insertOne(saveData);
 
             console.log("response?.data?.successData", response?.data?.successData);
@@ -124,6 +126,8 @@ async function run() {
             if (successData.status !== expectedStatus) {
                 throw new Error(`Invalid status: expected ${expectedStatus}, received ${successData.status}`);
             }
+            const findUserEmail = await paymentInfoCollection.findOne({ paymentTnxIdId: successData.tran_id })
+            console.log("findUserEmail", findUserEmail);
             const filter = { paymentTnxIdId: successData.tran_id };
             const updateInfo = {
                 $set: {
@@ -142,15 +146,16 @@ async function run() {
             if (expectedStatus === "VALID") {
                 const mailOptions = {
                     from: process.env.APP_USER, // My Gmail address
-                    to: 'rjridoy012@gmail.com', // customer email
+                    to: findUserEmail.customer_email, // customer email
                     subject: 'Payment Successful',
                     // text: `Your payment of ${successData.store_amount} was successful. Transaction ID: ${successData.tran_id}`,
                     html: `<div>
-                    <h2>Your payment of ${successData.store_amount} was successful.</h2>
+                    <h2>Hello ${findUserEmail.customer_name}.</h2>
+                    <h2>Your payment of ${successData.amount} was successful.</h2>
                     <h3>Your Transaction ID: ${successData.tran_id}</h3>
-                    <h4>amount: ${successData.amount}</h4>
-                    <h4>tran_date: ${successData.tran_date}</h4>
-                    <h4>card_type: ${successData.card_type}</h4>
+                    <h3>amount: ${successData.amount}</h3>
+                    <h3>tran_date: ${successData.tran_date}</h3>
+                    <h3>card_type: ${successData.card_type}</h3>
                     </div>`
                 };
                 transporter.sendMail(mailOptions, (error, info) => {
@@ -158,7 +163,8 @@ async function run() {
                         console.error("Error sending success email:", error);
                     } else {
                         console.log("Success email sent successfully:", info.response);
-                        res.send({response: response})
+                        // res.send({ response: response })
+                        res.redirect(redirectUrl);
                     }
                 });
                 // mailgun
@@ -173,7 +179,7 @@ async function run() {
                 // .then(msg => console.log(msg)) // logs response data
                 // .catch(err => console.log(err)); // logs any error
             }
-            res.redirect(redirectUrl);
+            // res.redirect(redirectUrl);
         };
 
         // Route for success-payment
